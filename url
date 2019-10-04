@@ -1,0 +1,252 @@
+#! /bin/bash
+################################################################################
+# url: Create a url to a file.
+#
+# Copyright (c) 2019, by Daniel C. Nygren.
+# E-mail: dan.nygren@gmail.com
+#
+#   This script copies a specified file (with either an appended date/time
+# stamp or a user provided filename) into a directory where it can be publicly
+# accessed. A URL to that file is sent to stdout (or /dev/console if the script
+# is not invoked from a terminal) and an .http suffix file that contains that
+# same URL is placed in the invoked directory for future reference.
+#
+# CALLING SEQUENCE  url source_file [destination_file_name]
+#
+# EXAMPLES          url file
+#                   url file with spaces
+#                   url file file.FixesBug1234567
+#                   url file withspaces (Error, one space assumes source dest)
+#                   url /file/with/path
+#                   url /file/with/path destination_file_name
+#                   url /file/with/path and spaces
+#
+# TARGET SYSTEM     Solaris, Linux
+#
+# DEVELOPED USING   Solaris 10, Linux 4.9
+#
+# CALLS             /bin/date (Linux) or /usr/xpg4/bin/date (Solaris),
+#                   /bin/cp, /usr/bin/tty, /bin/uname,
+#                   basename (no direct path because Linux and Solaris have
+#                   basename in different places)
+#
+# CALLED BY         N/A
+#
+# INPUTS            sourcefile, the current date and time
+#
+# OUTPUTS           $URL_DIRECTORY/$URL_FILE_NAME
+#                   Prints $URL_DIRECTORY/$URL_FILE_NAME to stdout
+#                   ./$FILE_NAME.http
+#
+# RETURNS           0 = success, 1 = failure
+#
+# ERROR HANDLING    Failure messages directed to file descriptor 4, which
+#                   points to standard error or /dev/console depending on
+#                   if the session was invoked from a terminal;
+#                   and a "fail" exit status.
+#
+# WARNINGS          1) The date and time hash used along with making the
+#                   directory contents unable to be listed, does not
+#                   prevent against a brute force attack method of
+#                   trying all dates and times if someone has a previous
+#                   URL that shows the source file name.
+#                   2) If a file name has only one space in it, it is taken as
+#                   a source file and a destination file and an error will
+#                   likely occur.
+#
+################################################################################
+
+# Set the file system path to a public directory to copy the file into.
+URL_DIRECTORY=/net/n/home/nygren/public_html/tmp
+
+# Set corresponding http path to same public directory
+# Intranet-only NFS to web server
+HTTP_PREFIX=http://nfsweb.msss.com/n/home/$LOGNAME/public_html/tmp
+# Intranet web server
+# HTTP_PREFIX=http://mmo-proc.msss.com/~$LOGNAME/tmp
+
+# By default, debugging information is not displayed
+debug=false
+#debug=true
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# ^^^^^^^^^^ Place code that may need modification above this point. ^^^^^^^^^^
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+#--- Functions ---
+
+Help ()
+{
+    # The Help function requires exit_status be set before it is called.
+    # If for some reason exit_status is undefined, set it to a non-zero
+    # (failure) value.
+    if [[ -z exit_status ]]
+    then
+        exit_status=1
+    fi
+
+    # ">&2" Duplicates stdout error message to stderr. $(basename $0) is
+    # used so just the name (not including the path) of the command used to
+    # invoke this script is used. Thus you can rename this file and the
+    # correct command will be printed out without having to change the
+    # source code.
+
+    echo >&2 \
+"Usage: $(basename $0) copies a specified file into a directory where it can be
+publicly accessed with either a date and time stamp prefix or a user provided
+filename. An http extension file that contains the URL to that file is placed
+in the original directory.
+Examples:
+$ url SOURCE_FILE [DEST_FILE_NAME]
+$ url backup.tar.gz (Creates 2019-05-10_134353.backup.tar.gz)
+$ url file.bin file.bin.BugFix1234567 (Creates file.bin.BugFix1234567)
+$ url -x (Exclude creation of .http file )
+$ url -h (prints out this help message)"
+    exit $exit_status # Return with appropriate exit status.
+}
+
+#--- Start Program ---
+
+# If standard input is a terminal (tty -s return value of 0=true=terminal)
+if /usr/bin/tty -s
+then
+    # Redirects file descriptor 3 to stdout if invoked from a terminal
+    exec 3>&1
+    # Redirects file descriptor 4 to stderr if invoked from a terminal
+    exec 4>&2
+else
+    # Redirects file descriptor 3 & 4 to /dev/console if this is a non-terminal
+    # session
+    exec 3> /dev/console
+    exec 4> /dev/console
+fi
+
+# By default a .http file is generated
+exclude_http=false
+
+# Get option parameters
+while getopts xhv opt
+do
+    case "$opt" in
+     x ) exclude_http=true  # Exclude generating a .http file
+         shift 1;;          # Discard this positional parameter
+     h ) exit_status=0
+         Help;;             # Call Help() with a zero (success) exit_status if
+                            # specifically invoked.
+     v ) Version;;
+    \? ) exit_status=1
+         Help;;             # If an unknown flag is used, call Help() with a
+                            # non-zero (failure) exit status.
+    esac
+done
+
+# If there is less than one argument
+if [[ $# -lt 1 ]]
+then
+    echo "$(basename $0): Wrong number of arguments ($# arguments) error." >&4
+    echo "$(basename $0) takes a source file as an argument and an optional \
+filename." >&4
+    exit 1 # Exit with a failure error status
+fi
+
+if [[ $# -eq 2 ]]
+then
+        # If there are exactly two arguments, use the second argument alone as
+        # the new filename.
+        SOURCE_FILE=$1
+        FILE_NAME=$2
+        URL_FILE_NAME=$FILE_NAME
+else
+        # Create a date and time to append to the file name.
+        # Get current date and time in ISO 8601 time format.
+        if [[ $(/bin/uname -s) == SunOS ]]
+        then
+            DATETIME=$(/usr/xpg4/bin/date '+%C%y-%m-%d_%H%M%S')
+        else
+            DATETIME=$(/bin/date '+%C%y-%m-%d_%H%M%S')
+        fi
+fi
+
+# Take care of cases of one argument and three or greater arguments.
+if [[ $# -eq 1 ]]
+then
+    # If there is only one argument
+    SOURCE_FILE=$1
+    # Handle the case of the source file having a path by removing the path.
+    BASENAME=${1##*/}
+    # Use the current date and time as the file prefix
+    FILE_NAME=$DATETIME.$BASENAME
+    URL_FILE_NAME=$FILE_NAME
+elif [[ $# -ge 3 ]]
+then
+    # If there are three or more arguments, assume the filename contains spaces.
+    SPACES_NAME=${@:1} # All positional parameters from 1 onwards
+    SOURCE_FILE=$SPACES_NAME
+    BASENAME=${SPACES_NAME##*/}
+    # For HTTP URLs, a space in a path fragment part has to be encoded to "%20"
+    ENCODED_SPACES_NAME=${BASENAME// /%20}
+    # Use the current date and time as the file prefix
+    FILE_NAME=$DATETIME.$BASENAME
+    URL_FILE_NAME=$DATETIME.$ENCODED_SPACES_NAME
+fi
+
+# Execute this for debugging information
+if [ "$debug" = true ]
+then
+    echo "Positional Parameters (Not counting the name of script) =" $#
+    echo "SOURCE_FILE" $SOURCE_FILE
+    echo "FILE_NAME" $FILE_NAME
+    echo "BASENAME" $BASENAME
+    echo "SPACES_NAME" $SPACES_NAME
+    echo "URL_FILE_NAME" $URL_FILE_NAME
+    echo "ENCODED_SPACES_NAME" $ENCODED_SPACES_NAME
+    echo "URL_FILE_NAME" $URL_FILE_NAME
+    echo "/bin/cp -f" \"$SOURCE_FILE\" \"$URL_DIRECTORY/$FILE_NAME\"
+    echo "chmod 0644" \"$URL_DIRECTORY/$FILE_NAME\"
+fi
+
+# If source file does not exist or is not a regular file or is not readable.
+if [[ ! -f "$SOURCE_FILE" || ! -r "$SOURCE_FILE" ]]
+then
+    echo "$(basename $0): Source file does not exist error." >&4
+    echo "$(basename $0) needs a valid readable source file. \"$SOURCE_FILE\" \
+is not a valid or readable file." >&4
+    exit 1 # Exit with a failure error status
+fi
+
+# Does the public directory exist, and is it writable in order to copy a file
+# into it?
+if [[ -d $URL_DIRECTORY && -w $URL_DIRECTORY ]]
+then
+
+if [ "$exclude_http" = false ]
+then
+    # Make a file that contains the URL in the same directory as the source
+    # file. If this file already exists, append the URL to the file.
+    echo "$HTTP_PREFIX/$URL_FILE_NAME" >> "$SOURCE_FILE.http"
+fi
+    # Print out a copy of the URL on the standard output or console
+    echo "$HTTP_PREFIX/$URL_FILE_NAME" >&3
+
+    # Make a copy of the file in a directory that can be accessed via a URL
+    # The copy's name is prefixed with the date and time. Prefixing with the
+    # date and time makes the files collate in a directory listing according
+    # to creation time, making it easier to manually delete files older than
+    # a certain date.
+    /bin/cp -f  "$SOURCE_FILE" "$URL_DIRECTORY/$FILE_NAME"
+
+    # Set permissions so file created in URL_DIRECTORY is readable to group
+    # and others, plus writable for the owner so it can be deleted.
+    chmod 0644 "$URL_DIRECTORY/$FILE_NAME"
+
+    exit_status=0 # Set a zero (success) exit status.
+
+else
+   # Print error message and exit with a failure if above test fails
+   echo "$0: Public directory does not exist" >&4
+   echo "The directory $URL_DIRECTORY specified in $0 as the public \
+directory does not exist." >&4
+   exit_status=1   # Set a non-zero (failure) exit status.
+fi
+
+exit $exit_status # Return exit status

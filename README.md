@@ -1,4 +1,4 @@
-# FileURL
+# FileURL (Copyright (c) 2019, by Daniel C. Nygren.)
 ## Creating URLs for use in E-Mail Attachments
 Why you should use URLs in E-mail messages
 Attaching files to e-mail messages is a convenient way of distributing files to the
