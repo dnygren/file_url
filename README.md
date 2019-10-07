@@ -1,11 +1,11 @@
 # FileURL
 #### (Copyright (c) 2019, by Daniel C. Nygren.)
-## Creating URLs for use in E-Mail Attachments
-Why you should use URLs in E-mail messages
-Attaching files to e-mail messages is a convenient way of distributing files to the
+## Creating URLs for use in Email Attachments
+### Why you should use URLs in Email messages
+Attaching files to email messages is a convenient way of distributing files to the
 recipients listed on the address line. This is fine for one or just a few recipients,
 however many attachments wind up getting sent to mailing list aliases that address
-large numbers of recipients. There are a few problems with attaching files to e-mails
+large numbers of recipients. There are a few problems with attaching files to emails
 destined to multiple recipients:
 *   Network and CPU bandwidth needed to send individual copies of attachments to each
 addressee's mail server.
@@ -15,9 +15,9 @@ addressee.
 addressee's mail client.
 *   Disk space needed at file servers to store individual copies of attachments downloaded
 by each addressee. A method of dealing with this problem manually is to create a Universal
-Resource Locator (URL) and place the URL into the e-mail text
+Resource Locator (URL) and place the URL into the email text
 
-## Why using URLs in e-mails hasn't gained widespread acceptance (yet?)
+### Why using URLs in emails hasn't gained widespread acceptance (yet?)
 The problem with manually creating URLs is it is a time consuming and error prone chore
 for the sender. While manually creating URLs saves network and CPU bandwidth along with
 disk space, it actually consumes the time of the sender, and is error prone. A simple
@@ -32,7 +32,7 @@ approach taken by the shell script **<tt>url</tt>**.
 *   The URL file has the same name as the source file with a <tt>.http</tt> extension
 appended to it.
 *   The URL file is stored in the same directory as the source file so it can be
-attached as easily to an e-mail message as the source file.
+attached as easily to an email message as the source file.
 *   The URL file points to a copy of the source file with a unique name so only
 recipients of that particular URL file attachment can see the file.
 This prevents an earlier recipient from being able to see changes made to the source file
