@@ -11,14 +11,12 @@
 # is not invoked from a terminal) and an .http suffix file that contains that
 # same URL is placed in the invoked directory for future reference.
 #
-# CALLING SEQUENCE  url source_file [destination_file_name]
+# CALLING SEQUENCE  url source_file [-o output_file_name]
 #
 # EXAMPLES          url file
 #                   url file with spaces
-#                   url file file.FixesBug1234567
-#                   url file withspaces (Error, one space assumes source dest)
+#                   url -o file.FixesBug1234567 file
 #                   url /file/with/path
-#                   url /file/with/path destination_file_name
 #                   url /file/with/path and spaces
 #
 # TARGET SYSTEM     Solaris, Linux
@@ -97,9 +95,9 @@ publicly accessed with either a date and time stamp prefix or a user provided
 filename. An http extension file that contains the URL to that file is placed
 in the original directory.
 Examples:
-$ url SOURCE_FILE [DEST_FILE_NAME]
+$ url [-o OUTPUT_FILE_NAME] SOURCE_FILE_NAME
 $ url backup.tar.gz (Creates 2019-05-10_134353.backup.tar.gz)
-$ url file.bin file.bin.BugFix1234567 (Creates file.bin.BugFix1234567)
+$ url -o file.bin.BugFix1234567 file.bin (Creates file.bin.BugFix1234567)
 $ url -x (Exclude creation of .http file )
 $ url -h (prints out this help message)"
     exit $exit_status # Return with appropriate exit status.
@@ -125,15 +123,15 @@ fi
 exclude_http=false
 
 # Get option parameters
-while getopts xhv opt
+while getopts ho:x opt
 do
     case "$opt" in
-     x ) exclude_http=true  # Exclude generating a .http file
-         shift 1;;          # Discard this positional parameter
      h ) exit_status=0
          Help;;             # Call Help() with a zero (success) exit_status if
                             # specifically invoked.
-     v ) Version;;
+     o ) output_file="$OPTARG";; # Set output file name from -o option.
+     x ) exclude_http=true  # Exclude generating a .http file
+         shift 1;;          # Discard this positional parameter
     \? ) exit_status=1
          Help;;             # If an unknown flag is used, call Help() with a
                             # non-zero (failure) exit status.
@@ -146,49 +144,36 @@ then
     echo "$(basename $0): Wrong number of arguments ($# arguments) error." >&4
     echo "$(basename $0) takes a source file as an argument and an optional \
 filename." >&4
-    exit 1 # Exit with a failure error status
+    exit_status=1     # Set a non-zero (failure) exit status.
+    exit $exit_status # Return exit status
 fi
 
-if [[ $# -eq 2 ]]
+if [ -n "$output_file" ]
 then
-        # If there are exactly two arguments, use the second argument alone as
-        # the new filename.
-        SOURCE_FILE=$1
-        FILE_NAME=$2
-        URL_FILE_NAME=$FILE_NAME
-else
-        # Create a date and time to append to the file name.
-        # Get current date and time in ISO 8601 time format.
-        if [[ $(/bin/uname -s) == SunOS ]]
-        then
-            DATETIME=$(/usr/xpg4/bin/date '+%C%y-%m-%d_%H%M%S')
-        else
-            DATETIME=$(/bin/date '+%C%y-%m-%d_%H%M%S')
-        fi
-fi
-
-# Take care of cases of one argument and three or greater arguments.
-if [[ $# -eq 1 ]]
-then
-    # If there is only one argument
-    SOURCE_FILE=$1
-    # Handle the case of the source file having a path by removing the path.
-    BASENAME=${1##*/}
-    # Use the current date and time as the file prefix
-    FILE_NAME=$DATETIME.$BASENAME
+    FILE_NAME=$output_file
     URL_FILE_NAME=$FILE_NAME
-elif [[ $# -ge 3 ]]
-then
-    # If there are three or more arguments, assume the filename contains spaces.
+    # Assume the input filename contains spaces.
+    SPACES_NAME=${@:3} # All positional parameters from 3 onwards
+else
+    # Assume the input filename contains spaces.
     SPACES_NAME=${@:1} # All positional parameters from 1 onwards
-    SOURCE_FILE=$SPACES_NAME
-    BASENAME=${SPACES_NAME##*/}
-    # For HTTP URLs, a space in a path fragment part has to be encoded to "%20"
-    ENCODED_SPACES_NAME=${BASENAME// /%20}
-    # Use the current date and time as the file prefix
-    FILE_NAME=$DATETIME.$BASENAME
-    URL_FILE_NAME=$DATETIME.$ENCODED_SPACES_NAME
 fi
+
+SOURCE_FILE=$SPACES_NAME
+BASENAME=${SPACES_NAME##*/}
+# For HTTP URLs, a space in a path fragment part has to be encoded to "%20"
+ENCODED_SPACES_NAME=${BASENAME// /%20}
+# Create a date and time to append to the file name.
+# Get current date and time in ISO 8601 time format.
+if [[ $(/bin/uname -s) == SunOS ]]
+then
+    DATETIME=$(/usr/xpg4/bin/date '+%C%y-%m-%d_%H%M%S')
+else
+    DATETIME=$(/bin/date '+%C%y-%m-%d_%H%M%S')
+fi
+# Use the current date and time as the file prefix
+FILE_NAME=$DATETIME.$BASENAME
+URL_FILE_NAME=$DATETIME.$ENCODED_SPACES_NAME
 
 # Execute this for debugging information
 if [ "$debug" = true ]

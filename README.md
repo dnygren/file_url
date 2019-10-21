@@ -59,9 +59,9 @@ publicly accessed with either a date and time stamp prefix or a user provided
 filename. An http extension file that contains the URL to that file is placed
 in the original directory.
 Examples:
-$ url SOURCE_FILE [DEST_FILE_NAME]
+$ url [-o OUTPUT_FILE_NAME] SOURCE_FILE_NAME
 $ url backup.tar.gz (Creates 2019-05-10_134353.backup.tar.gz)
-$ url file.bin file.bin.BugFix1234567 (Creates file.bin.BugFix1234567)
+$ url -o file.bin.BugFix1234567 file.bin (Creates file.bin.BugFix1234567)
 $ url -x (Exclude creation of .http file )
 $ url -h (prints out this help message)
 </pre>
